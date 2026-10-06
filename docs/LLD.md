@@ -1,24 +1,22 @@
-# Low-level design
+# Low-Level Design (LLD) — Secure Digital Certificate Wallet
 
-```mermaid
-classDiagram
-  SecureAuth --> SecureAuthClient
-  SecureAuthClient <|.. DefaultSecureAuthClient
-  DefaultSecureAuthClient --> AuthApi
-  DefaultSecureAuthClient --> TokenStorage
-  TokenStorage <|.. KeystoreTokenStorage
-  DefaultSecureAuthClient --> SessionState
-```
+## 1. Android Client Architecture
 
-`SecureAuth` is the stable factory; consumers see immutable API models and `StateFlow`, not Retrofit DTOs. `DefaultSecureAuthClient` owns transitions, maps transport failures, and serializes refresh with a coroutine `Mutex`. `AuthApi` is the remote boundary. `KeystoreTokenStorage` AES-GCM-encrypts a token envelope with a non-exportable Android Keystore key and destroys ciphertext/key on logout or corruption. `BiometricAuthenticator` maps platform callbacks without handling biometric data.
+The Android application is organized under a modular Clean Architecture pattern using Kotlin, Jetpack Compose, Material 3, Hilt, Room, and Retrofit.
 
-The backend controller accepts validated DTOs and delegates transaction boundaries to `AuthService`. `BCryptPasswordEncoder` hashes passwords and OTP values; `JwtService` signs and verifies access JWTs. Refresh tokens are random opaque values stored only as SHA-256 hashes and rotated on use. JPA repositories own persistence, `RateLimiter` provides local fixed-window throttling, `RequestIdFilter` propagates correlation IDs, and `ErrorHandler` emits stable safe errors.
+### 1.1 Module Structure & Responsibilities
 
-```mermaid
-sequenceDiagram
-  Controller->>AuthService: verify(challenge, otp)
-  AuthService->>OtpRepository: load
-  AuthService->>AuthService: validate expiry/attempts/consumption
-  AuthService->>RefreshTokenRepository: store token hash
-  AuthService-->>Controller: signed access + opaque refresh
-```
+| Module | Namespace | Purpose |
+| :--- | :--- | :--- |
+| `:android:core` | `com.srichaitanya.wallet.core` | Pure domain models (`DigitalCertificate`, `Proof`, `Resource`), UseCases, and Repository Interfaces. |
+| `:android:core-security` | `com.srichaitanya.wallet.security` | Android Keystore AES-256-GCM encryption manager, `BiometricAuthManager`, and Ed25519 verification. |
+| `:android:core-network` | `com.srichaitanya.wallet.network` | Retrofit service interfaces, OkHttp interceptors, Network DTOs, and Serialization mappers. |
+| `:android:core-database` | `com.srichaitanya.wallet.database` | Room database (`WalletDatabase`), DAOs, Room entities, and local caching. |
+| `:android:core-ui` | `com.srichaitanya.wallet.ui` | Material 3 Theme, reusable components (`CertificateCard`, `StatusBadge`, `SyncStateBanner`). |
+| `:android:feature-auth` | `com.srichaitanya.wallet.auth` | Login and Register Jetpack Compose screens and `AuthViewModel`. |
+| `:android:feature-wallet` | `com.srichaitanya.wallet.wallet` | Home screen, Certificate list, Certificate detail screen, and `WalletViewModel`. |
+| `:android:feature-certificate` | `com.srichaitanya.wallet.certificate` | Selective disclosure claim selection and dynamic QR presentation generator. |
+| `:android:feature-scanner` | `com.srichaitanya.wallet.scanner` | CameraX QR Scanner analyzer and manual payload fallback. |
+| `:android:feature-verification` | `com.srichaitanya.wallet.verification` | Verification result display and verification history audit log. |
+| `:android:feature-profile` | `com.srichaitanya.wallet.profile` | User profile, security status, and logout screen. |
+| `:android:app` | `com.srichaitanya.wallet` | Application entry point, Hilt dependency injection modules, Navigation Host. |

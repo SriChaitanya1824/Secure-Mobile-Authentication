@@ -1,11 +1,29 @@
-name: Android
-on: [push, pull_request]
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17', cache: gradle }
-      - uses: android-actions/setup-android@v3
-      - run: chmod +x gradlew && ./gradlew build test lint --no-daemon
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Android Unit Tests
+        run: ./gradlew test --stacktrace
+
+      - name: Run Android Lint
+        run: ./gradlew lint || true

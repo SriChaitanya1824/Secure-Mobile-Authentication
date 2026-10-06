@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.srichaitanya.wallet.core.CoreLogicTests" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-06T10:54:55" hostname="Mac" time="0.02">
+  <properties/>
+  <testcase name="testDeviceSecurityScoreCalculation" classname="com.srichaitanya.wallet.core.CoreLogicTests" time="0.002"/>
+  <testcase name="testSelectiveDisclosurePresentation" classname="com.srichaitanya.wallet.core.CoreLogicTests" time="0.018"/>
+  <testcase name="testCertificateExpiryCalculation" classname="com.srichaitanya.wallet.core.CoreLogicTests" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

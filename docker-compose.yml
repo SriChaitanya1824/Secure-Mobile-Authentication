@@ -1,21 +1,52 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: certificate_wallet_db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-secureauth}
-      POSTGRES_USER: ${POSTGRES_USER:-secureauth}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secureauth}
-    ports: ["5432:5432"]
-    healthcheck: { test: ["CMD-SHELL", "pg_isready -U secureauth"], interval: 5s, timeout: 3s, retries: 10 }
-    volumes: ["postgres-data:/var/lib/postgresql/data"]
-  backend:
-    build: ./backend
+      POSTGRES_DB: ${POSTGRES_DB:-certwallet}
+      POSTGRES_USER: ${POSTGRES_USER:-certwallet_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_certwallet_pass_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-certwallet_user} -d ${POSTGRES_DB:-certwallet}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  issuer-backend:
+    build:
+      context: .
+      dockerfile: issuer-backend/Dockerfile
+    container_name: issuer_service
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-secureauth}
-      POSTGRES_USER: ${POSTGRES_USER:-secureauth}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secureauth}
-      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-this-32-chars}
-      OTP_DEVELOPMENT_MODE: ${OTP_DEVELOPMENT_MODE:-true}
-    ports: ["8080:8080"]
-    depends_on: { postgres: { condition: service_healthy } }
-volumes: { postgres-data: {} }
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-certwallet}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-certwallet_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-secure_certwallet_pass_2026}
+      JWT_SECRET: ${JWT_SECRET:-dev-super-secure-jwt-signing-secret-key-32-bytes-minimum}
+      ISSUER_ED25519_PRIVATE_KEY: ${ISSUER_ED25519_PRIVATE_KEY:-MC4CAQAwBQYDK2VwBCIEIIv7p6m/zI4b6s1x7gq3h0k9jL2u1fQe8w6a5z4y3x2w}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  verifier-backend:
+    build:
+      context: .
+      dockerfile: verifier-backend/Dockerfile
+    container_name: verifier_service
+    environment:
+      ISSUER_SERVICE_URL: http://issuer-backend:8080
+      JWT_SECRET: ${JWT_SECRET:-dev-super-secure-jwt-signing-secret-key-32-bytes-minimum}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - issuer-backend
+
+volumes:
+  postgres-data:

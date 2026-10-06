@@ -1,2 +1,0 @@
--keepattributes Signature,*Annotation*
--keep class com.srichaitanya.secureauth.api.** { public *; }

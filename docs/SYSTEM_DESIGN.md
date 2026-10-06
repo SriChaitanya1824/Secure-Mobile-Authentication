@@ -1,11 +1,38 @@
-# System design
+# System Design & Scalability — Secure Digital Certificate Wallet
 
-## CURRENT IMPLEMENTATION
+## 1. Production Architecture Evolution
 
-One Spring Boot instance uses PostgreSQL, in-process fixed-window rate limits, synchronous OTP development delivery, one active JWT signing secret, request IDs, and database-backed refresh revocation. Docker Compose is intended for local evaluation, not Internet exposure.
+While the portfolio prototype provides a complete local trust environment with Spring Boot, PostgreSQL, and Android, an enterprise digital certificate platform (such as VIDA's production infrastructure) evolves into a high-throughput, fault-tolerant distributed system.
 
-## PRODUCTION EVOLUTION
+```mermaid
+flowchart TD
+    Client[Android Wallets / Verifier Clients] --> CDN[Cloudflare CDN / WAF / DDoS Protection]
+    CDN --> APIGW[Kong API Gateway / OAuth2 Token Introspection]
+    
+    subgraph CoreServices[Distributed Microservices Cluster]
+        APIGW --> AuthSvc[Authentication & Session Service]
+        APIGW --> IssueSvc[Issuance & Signing Service]
+        APIGW --> VerifySvc[Verification & Status Engine]
+        APIGW --> SyncSvc[Delta Sync Engine]
+    end
 
-Place stateless API instances behind an API gateway and load balancer; move counters and short-lived challenge coordination to Redis with atomic scripts. Use managed primary/replica PostgreSQL, bounded connection pools, backups, and tested point-in-time recovery. Put OTP delivery and audit exports on queues. Store secrets and rotating signing keys in a secret manager backed by KMS/HSM, publish key IDs/JWKS, and overlap rotations.
+    subgraph SecurityTier[Hardware Security Layer]
+        IssueSvc <--> CloudHSM[AWS CloudHSM / Google Cloud KMS]
+    end
 
-Adopt centralized structured logs, metrics for latency/failure/rate limiting, distributed tracing, alerting, and privacy-aware retention. Feature flags must fail safely. Multi-region service needs region-aware data ownership, replicated revocation, clock monitoring, failover exercises, and documented RPO/RTO. Cache only non-sensitive configuration. A distributed token family model should detect refresh replay and revoke the whole family.
+    subgraph CacheTier[High-Performance Cache]
+        VerifySvc <--> RedisCluster[(Redis Cluster - Revocation Cache & Nonces)]
+    end
+
+    subgraph DataTier[Distributed Database Tier]
+        AuthSvc & IssueSvc & SyncSvc --> AuroraPG[(Amazon Aurora PostgreSQL Multi-AZ)]
+        AuroraPG --> ReadReplica1[(Read Replica 1)]
+        AuroraPG --> ReadReplica2[(Read Replica 2)]
+    end
+
+    subgraph EventStream[Asynchronous Audit & Event Log]
+        IssueSvc & VerifySvc --> Kafka[Apache Kafka Event Bus]
+        Kafka --> ClickHouse[(ClickHouse Audit Warehouse)]
+        Kafka --> SIEM[Enterprise SIEM / Splunk]
+    end
+```
